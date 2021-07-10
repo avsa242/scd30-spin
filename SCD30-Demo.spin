@@ -21,7 +21,7 @@ CON
 
     I2C_SCL     = 28
     I2C_SDA     = 29
-    I2C_HZ      = 100_000                       ' max is 100_000
+    I2C_HZ      = 50_000                       ' max is 100_000
                                                 ' (Sensirion recommends 50_000)
 
 ' --

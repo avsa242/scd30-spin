@@ -29,6 +29,7 @@ OBJ
     i2c : "tiny.com.i2c"                        ' SPIN I2C engine (~40kHz)
     core: "core.con.scd30"                      ' hw-specific low-level const's
     time: "time"                                ' basic timing functions
+    crc : "math.crc"                            ' CRC routines
 
 PUB Null{}
 ' This is not a top-level object
@@ -63,10 +64,19 @@ PUB DeviceID{}: id
 PUB Reset{}
 ' Reset the device
 
-PUB Version{}: ver
-
+PUB Version{}: ver | crc_tmp
+' Firmware version
+'   Returns: word [MSB:major..LSB:minor]
+'   Known values: $03_42
     ver := 0
     readreg(core#FWVER, 3, @ver)
+    crc_tmp := ver.byte[0]
+    ver >>= 8
+
+    if crc.sensirioncrc8(@ver, 2) == crc_tmp
+        return ver
+    else
+        return -1
 
 PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
 ' Read nr_bytes from the device into ptr_buff
