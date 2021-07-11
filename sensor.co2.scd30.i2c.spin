@@ -20,11 +20,17 @@ CON
     DEF_HZ          = 100_000
     I2C_MAX_FREQ    = core#I2C_MAX_FREQ
 
+' Operating modes
+    STANDBY         = 0
+    CONT            = 1
+
 ' Error codes
     EBADCRC         = $E000_0C0C
 
 VAR
 
+    word _presscomp
+    byte _opmode
 
 OBJ
 
@@ -76,6 +82,35 @@ PUB DataReady{}: flag | crc_tmp
 
 PUB DeviceID{}: id
 ' Read device identification
+
+PUB AmbPressure(press): curr_press
+' Set ambient pressure, in millibars, for use in on-sensor compensation
+'   Valid values:
+'       0: disable compensation
+'       700..1400
+'   Any other value returns the current setting
+'   NOTE: To effect settings, OpMode(CONT) must be called
+    case press
+        0, 700..1400:
+            _presscomp := press
+        other:
+            return _presscomp
+
+PUB OpMode(mode): curr_mode
+' Set operating mode
+'   Valid values:
+'      *STANDBY (0): stop measuring
+'       CONT (1): continuous measurement
+'   Any other value returns the current setting
+    curr_mode := _opmode
+    case mode
+        CONT:
+            writereg(core#CONTMEAS, 2, @_presscomp)
+        STANDBY:
+            writereg(core#STOPMEAS, 0, 0)
+        other:
+            return curr_mode
+    _opmode := mode
 
 PUB Reset{}
 ' Reset the device
