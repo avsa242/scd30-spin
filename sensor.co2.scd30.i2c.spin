@@ -12,13 +12,16 @@
 
 CON
 
-    SLAVE_WR          = core#SLAVE_ADDR
-    SLAVE_RD          = core#SLAVE_ADDR|1
+    SLAVE_WR        = core#SLAVE_ADDR
+    SLAVE_RD        = core#SLAVE_ADDR|1
 
-    DEF_SCL           = 28
-    DEF_SDA           = 29
-    DEF_HZ            = 100_000
-    I2C_MAX_FREQ      = core#I2C_MAX_FREQ
+    DEF_SCL         = 28
+    DEF_SDA         = 29
+    DEF_HZ          = 100_000
+    I2C_MAX_FREQ    = core#I2C_MAX_FREQ
+
+' Error codes
+    EBADCRC         = $E000_0C0C
 
 VAR
 
@@ -59,6 +62,18 @@ PUB Defaults{}
 ' Set factory defaults
     reset{}
 
+PUB DataReady{}: flag | crc_tmp
+' Flag indicating data ready
+    flag := 0
+    readreg(core#GETDRDY, 3, @flag)
+    crc_tmp := flag.byte[0]
+    flag >>= 8
+
+    if crc.sensirioncrc8(@flag, 2) == crc_tmp
+        return ((flag & 1) == 1)
+    else
+        return EBADCRC
+
 PUB DeviceID{}: id
 ' Read device identification
 
@@ -78,7 +93,7 @@ PUB Version{}: ver | crc_tmp
     if crc.sensirioncrc8(@ver, 2) == crc_tmp
         return ver
     else
-        return -1
+        return EBADCRC
 
 PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
 ' Read nr_bytes from the device into ptr_buff
@@ -92,6 +107,8 @@ PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
             i2c.start{}
             i2c.wrblock_lsbf(@cmd_pkt, 3)
             i2c.stop{}
+
+            time.msleep(3)                      ' wait between write and read
 
             i2c.start{}
             i2c.wr_byte(SLAVE_RD)

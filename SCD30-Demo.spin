@@ -37,9 +37,10 @@ PUB Main{}
 
     setup{}
 
-    ser.position(0, 5)
-    ser.hex(co2.version, 8)
     repeat
+        ser.position(0, 3)
+        ser.dec(co2.dataready)
+        ser.clearline
 
 PUB Setup{}
 
