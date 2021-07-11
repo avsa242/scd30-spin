@@ -5,7 +5,7 @@
     Description: Driver for the Sensirion SCD30 CO2 sensor
     Copyright (c) 2021
     Started Jul 10, 2021
-    Updated Jul 10, 2021
+    Updated Jul 11, 2021
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -57,12 +57,14 @@ PUB Stop{}
 
 PUB Defaults{}
 ' Set factory defaults
+    reset{}
 
 PUB DeviceID{}: id
 ' Read device identification
 
 PUB Reset{}
 ' Reset the device
+    writereg(core#SOFTRESET, 0, 0)
 
 PUB Version{}: ver | crc_tmp
 ' Firmware version
