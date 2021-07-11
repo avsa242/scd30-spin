@@ -68,6 +68,19 @@ PUB Defaults{}
 ' Set factory defaults
     reset{}
 
+PUB AmbPressure(press): curr_press
+' Set ambient pressure, in millibars, for use in on-sensor compensation
+'   Valid values:
+'       0: disable compensation
+'       700..1400
+'   Any other value returns the current setting
+'   NOTE: To effect settings, OpMode(CONT) must be called
+    case press
+        0, 700..1400:
+            _presscomp := press
+        other:
+            return _presscomp
+
 PUB DataReady{}: flag | crc_tmp
 ' Flag indicating data ready
     flag := 0
@@ -82,19 +95,6 @@ PUB DataReady{}: flag | crc_tmp
 
 PUB DeviceID{}: id
 ' Read device identification
-
-PUB AmbPressure(press): curr_press
-' Set ambient pressure, in millibars, for use in on-sensor compensation
-'   Valid values:
-'       0: disable compensation
-'       700..1400
-'   Any other value returns the current setting
-'   NOTE: To effect settings, OpMode(CONT) must be called
-    case press
-        0, 700..1400:
-            _presscomp := press
-        other:
-            return _presscomp
 
 PUB OpMode(mode): curr_mode
 ' Set operating mode
