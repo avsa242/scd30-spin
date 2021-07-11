@@ -96,6 +96,27 @@ PUB DataReady{}: flag | crc_tmp
 PUB DeviceID{}: id
 ' Read device identification
 
+PUB MeasInterval(t_int): curr_t | crc_tmp[2]
+' Set measurement interval, in seconds
+'   Valid values: 2..1800
+'   Any other value returns the current setting
+    curr_t := 0
+    readreg(core#SETMEASINTERV, 3, @curr_t)
+    case t_int
+        2..1800:
+            ' generate CRC of data
+            crc_tmp := crc.sensirioncrc8(@t_int, 2)
+            t_int <<= 8
+            t_int.byte[0] := crc_tmp            ' tack it on to the data
+            writereg(core#SETMEASINTERV, 3, @t_int)
+        other:
+            crc_tmp := curr_t.byte[0]
+            curr_t >>= 8
+            if crc.sensirioncrc8(@curr_t, 2) == crc_tmp
+                return curr_t
+            else
+                return EBADCRC
+
 PUB OpMode(mode): curr_mode
 ' Set operating mode
 '   Valid values:
