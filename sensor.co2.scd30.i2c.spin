@@ -5,7 +5,7 @@
     Description: Driver for the Sensirion SCD30 CO2 sensor
     Copyright (c) 2021
     Started Jul 10, 2021
-    Updated Jul 11, 2021
+    Updated Jul 18, 2021
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -29,13 +29,16 @@ CON
 
 VAR
 
+    long _co2
+    long _temp
+    long _rh
     word _presscomp
     byte _opmode
 
 OBJ
 
-'    i2c : "com.i2c"                             ' PASM I2C engine (up to ~800kHz)
-    i2c : "tiny.com.i2c"                        ' SPIN I2C engine (~40kHz)
+    i2c : "com.i2c"                             ' PASM I2C engine (up to ~800kHz)
+'    i2c : "tiny.com.i2c"                        ' SPIN I2C engine (~40kHz)
     core: "core.con.scd30"                      ' hw-specific low-level const's
     time: "time"                                ' basic timing functions
     crc : "math.crc"                            ' CRC routines
@@ -51,9 +54,9 @@ PUB Startx(SCL_PIN, SDA_PIN, I2C_HZ): status
 ' Start using custom IO pins and I2C bus frequency
     if lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31) and {
 }   I2C_HZ =< core#I2C_MAX_FREQ                 ' validate pins and bus freq
-        if (status := i2c.init(SCL_PIN, SDA_PIN))', I2C_HZ))
+        if (status := i2c.init(SCL_PIN, SDA_PIN, I2C_HZ))
             time.usleep(core#T_POR)             ' wait for device startup
-            if i2c.present(SLAVE_WR)            ' test device bus presence
+            if present{}
                 return
     ' if this point is reached, something above failed
     ' Re-check I/O pin assignments, bus speed, connections, power
@@ -68,6 +71,14 @@ PUB Defaults{}
 ' Set factory defaults
     reset{}
 
+PUB Present{}: ack
+' Test device bus presence
+    ack := 0
+    i2c.start{}
+    ack := i2c.write(SLAVE_WR)
+    i2c.stop{}                                  ' P: SCD30 doesn't support Sr
+    return (ack == i2c#ACK)                     ' return TRUE if present
+
 PUB AmbPressure(press): curr_press
 ' Set ambient pressure, in millibars, for use in on-sensor compensation
 '   Valid values:
@@ -80,6 +91,11 @@ PUB AmbPressure(press): curr_press
             _presscomp := press
         other:
             return _presscomp
+
+PUB CO2Data{}: f_co2
+' CO2 data
+'   Returns: IEEE-754 float
+    return _co2
 
 PUB DataReady{}: flag | crc_tmp
 ' Flag indicating data ready
@@ -95,6 +111,11 @@ PUB DataReady{}: flag | crc_tmp
 
 PUB DeviceID{}: id
 ' Read device identification
+
+PUB HumidityData{}: rh_adc
+' Relative humidity data
+'   Returns: IEEE-754 float
+    return _rh
 
 PUB MeasInterval(t_int): curr_t | crc_tmp[2]
 ' Set measurement interval, in seconds
@@ -117,6 +138,42 @@ PUB MeasInterval(t_int): curr_t | crc_tmp[2]
             else
                 return EBADCRC
 
+PUB Measure{} | meas_tmp[5], co2_tmp, temp_tmp, rh_tmp, crc_tmp
+' Read measurement data
+    readreg(core#READMEAS, 18, @meas_tmp)
+    _co2.byte[3] := meas_tmp.byte[17]
+    _co2.byte[2] := meas_tmp.byte[16]
+    crc_tmp.byte[1] := meas_tmp.byte[15]
+    _co2.byte[1] := meas_tmp.byte[14]
+    _co2.byte[0] := meas_tmp.byte[13]
+    crc_tmp.byte[0] := meas_tmp.byte[12]
+
+    ifnot crc.sensirioncrc8(@_co2.byte[2], 2) == crc_tmp.byte[1] and {
+}   crc.sensirioncrc8(@_co2, 2) == crc_tmp.byte[0]
+        return EBADCRC
+
+    _temp.byte[3] := meas_tmp.byte[11]
+    _temp.byte[2] := meas_tmp.byte[10]
+    crc_tmp.byte[1] := meas_tmp.byte[9]
+    _temp.byte[1] := meas_tmp.byte[8]
+    _temp.byte[0] := meas_tmp.byte[7]
+    crc_tmp.byte[0] := meas_tmp.byte[6]
+
+    ifnot crc.sensirioncrc8(@_temp.byte[2], 2) == crc_tmp.byte[1] and {
+}   crc.sensirioncrc8(@_temp, 2) == crc_tmp.byte[0]
+        return EBADCRC
+
+    _rh.byte[3] := meas_tmp.byte[5]
+    _rh.byte[2] := meas_tmp.byte[4]
+    crc_tmp.byte[1] := meas_tmp.byte[3]
+    _rh.byte[1] := meas_tmp.byte[2]
+    _rh.byte[0] := meas_tmp.byte[1]
+    crc_tmp.byte[0] := meas_tmp.byte[0]
+
+    ifnot crc.sensirioncrc8(@_rh.byte[2], 2) == crc_tmp.byte[1] and {
+}   crc.sensirioncrc8(@_rh, 2) == crc_tmp.byte[0]
+        return EBADCRC
+
 PUB OpMode(mode): curr_mode
 ' Set operating mode
 '   Valid values:
@@ -136,6 +193,12 @@ PUB OpMode(mode): curr_mode
 PUB Reset{}
 ' Reset the device
     writereg(core#SOFTRESET, 0, 0)
+    time.usleep(core#T_RES)
+
+PUB TempData{}: temp_adc
+' Temperature data
+'   Returns: IEEE-754 float
+    return _temp
 
 PUB Version{}: ver | crc_tmp
 ' Firmware version
@@ -162,9 +225,9 @@ PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
             cmd_pkt.byte[2] := reg_nr.byte[0]
             i2c.start{}
             i2c.wrblock_lsbf(@cmd_pkt, 3)
-            i2c.stop{}
+            i2c.stop{}                          ' P: SCD30 doesn't support Sr
 
-            time.msleep(3)                      ' wait between write and read
+            time.usleep(core#T_WRRD)            ' wait between write and read
 
             i2c.start{}
             i2c.wr_byte(SLAVE_RD)
@@ -182,7 +245,7 @@ PRI writeReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
     cmd_pkt.byte[2] := reg_nr.byte[0]
     case reg_nr
         core#CONTMEAS, core#STOPMEAS, core#SETMEASINTERV, core#ALTITUDECOMP, {
-}       core#SETRECALVAL, core#AUTOSELFCAL, core#SETTEMPOFFS, core#SOFTRESET:
+}       core#SETRECALVAL, core#AUTOSELFCAL, core#SETTEMPOFFS:
             i2c.start{}
             i2c.wrblock_lsbf(@cmd_pkt, 3)
 
@@ -195,7 +258,6 @@ PRI writeReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
             i2c.stop{}
         other:
             return
-
 
 DAT
 {

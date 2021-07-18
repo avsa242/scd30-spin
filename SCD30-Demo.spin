@@ -21,7 +21,7 @@ CON
 
     I2C_SCL     = 28
     I2C_SDA     = 29
-    I2C_HZ      = 50_000                       ' max is 100_000
+    I2C_HZ      = 100_000                       ' max is 100_000
                                                 ' (Sensirion recommends 50_000)
 
 ' --
@@ -32,15 +32,28 @@ OBJ
     ser     : "com.serial.terminal.ansi"
     time    : "time"
     co2     : "sensor.co2.scd30.i2c"
+    math    : "tiny.math.float"
+    fs[3]   : "string.float"
 
-PUB Main{}
+PUB Main{} | coo, temp, rh
 
     setup{}
 
+    co2.reset{}
+    co2.opmode(co2#CONT)
+    co2.measinterval(2)
     repeat
+        repeat until co2.dataready{} == true
+        co2.measure{}
+        coo := fs[0].floattostring(co2.co2data)
+        temp := fs[1].floattostring(co2.tempdata)
+        rh := fs[2].floattostring(co2.humiditydata)
+
         ser.position(0, 3)
-        ser.dec(co2.dataready)
-        ser.clearline
+        ser.printf1(string("CO2: %sppm     \n"), coo)
+        ser.printf1(string("Temp: %sC      \n"), temp)
+        ser.printf1(string("RH: %s%%      \n"), rh)
+        time.msleep(100)
 
 PUB Setup{}
 

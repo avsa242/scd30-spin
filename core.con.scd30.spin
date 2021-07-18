@@ -5,7 +5,7 @@
     Description: SCD30-specific low-level constants
     Copyright (c) 2021
     Started Jul 10, 2021
-    Updated Jul 10, 2021
+    Updated Jul 18, 2021
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -16,8 +16,8 @@ CON
     I2C_MAX_FREQ    = 100_000                   ' device max I2C bus freq
     SLAVE_ADDR      = $61 << 1                  ' 7-bit format slave address
     T_POR           = 2_000_000                 ' startup time (usecs)
-
-    DEVID_RESP      = $00                       ' device ID expected response
+    T_RES           = 23_000                    ' reset/warm startup time
+    T_WRRD          = 4_000                     ' delay between wr/rd headers
 
 ' Register definitions
     CONTMEAS        = $0010
