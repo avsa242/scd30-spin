@@ -9,7 +9,9 @@
     See end of file for terms of use.
     --------------------------------------------
 }
-
+' Uncomment one of the below to choose either the PASM or SPIN I2C engine
+#define SCD30_PASM
+'#define SCD30_SPIN
 CON
 
     _clkmode    = cfg#_clkmode

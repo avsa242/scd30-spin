@@ -7,8 +7,9 @@ This is a P8X32A/Propeller, P2X8C4M64P/Propeller 2 driver object for the Sensiri
 
 ## Salient Features
 
-* I2C connection at up to 100kHz (*max recommended according to Sensirion is 50kHz*)
-* Read CO2, Temperature, RH data (IEEE-754 float)
+* I2C connection at up to 100kHz (PASM engine), or ~30kHz (SPIN engine)
+    (*max recommended according to Sensirion is 50kHz*)
+* Read CO2, Temperature, RH data (IEEE-754 float, or hundredths of unit integer)
 * Set measurement interval in seconds
 * Sensor data-ready status
 * Read sensor firmware version
@@ -33,11 +34,13 @@ P1/SPIN1:
 ## Limitations
 
 * Very early in development - may malfunction, or outright fail to build
-* Sensor data only available in IEEE-754 floating point format
 
 ## TODO
 
 - [x] add support for setting temperature scale
 - [x] add support for integer sensor data return values, as in other drivers
-- [ ] add support for pure-spin I2C engine
+- [x] add support for pure-spin I2C engine
+- [ ] add support for altitude compensation
+- [ ] add support for (de)activating automatic self-calibration
+- [ ] add support for setting forced recalibration value
 - [ ] port to P2/SPIN2

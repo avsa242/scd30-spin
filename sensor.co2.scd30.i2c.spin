@@ -42,8 +42,13 @@ VAR
 
 OBJ
 
+#ifdef SCD30_PASM
     i2c : "com.i2c"                             ' PASM I2C engine (up to ~800kHz)
-'    i2c : "tiny.com.i2c"                        ' SPIN I2C engine (~40kHz)
+#elseifdef SCD30_SPIN
+    i2c : "tiny.com.i2c"                        ' SPIN I2C engine (~40kHz)
+#else
+#error "One of SCD30_PASM or SCD30_SPIN must be defined"
+#endif
     core: "core.con.scd30"                      ' hw-specific low-level const's
     time: "time"                                ' basic timing functions
     crc : "math.crc"                            ' CRC routines
@@ -60,7 +65,11 @@ PUB Startx(SCL_PIN, SDA_PIN, I2C_HZ): status
 ' Start using custom IO pins and I2C bus frequency
     if lookdown(SCL_PIN: 0..31) and lookdown(SDA_PIN: 0..31) and {
 }   I2C_HZ =< core#I2C_MAX_FREQ                 ' validate pins and bus freq
+#ifdef SCD30_PASM
         if (status := i2c.init(SCL_PIN, SDA_PIN, I2C_HZ))
+#elseifdef SCD30_SPIN
+        if (status := i2c.init(SCL_PIN, SDA_PIN))
+#endif
             time.usleep(core#T_POR)             ' wait for device startup
             if present{}
                 return
@@ -154,7 +163,7 @@ PUB MeasInterval(t_int): curr_t | crc_tmp[2]
             else
                 return EBADCRC
 
-PUB Measure{} | meas_tmp[5], co2_tmp, temp_tmp, rh_tmp, crc_tmp
+PUB Measure{} | meas_tmp[5], crc_tmp
 ' Read measurement data
     readreg(core#READMEAS, 18, @meas_tmp)
     _co2.byte[3] := meas_tmp.byte[17]
