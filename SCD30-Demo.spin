@@ -5,7 +5,7 @@
     Description: Demo of the SCD30 driver
     Copyright (c) 2021
     Started Jul 10, 2021
-    Updated Jul 10, 2021
+    Updated Jul 19, 2021
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -26,34 +26,69 @@ CON
 
 ' --
 
+    C           = 0
+    F           = 1
+
 OBJ
 
     cfg     : "core.con.boardcfg.flip"
     ser     : "com.serial.terminal.ansi"
     time    : "time"
-    co2     : "sensor.co2.scd30.i2c"
-    math    : "tiny.math.float"
-    fs[3]   : "string.float"
+    env     : "sensor.co2.scd30.i2c"
+    int     : "string.integer"
+    sf      : "string.format"
 
-PUB Main{} | coo, temp, rh
+VAR
+
+    byte    _tmp_buff[16]
+
+PUB Main{} | co2, temp, rh
 
     setup{}
 
-    co2.reset{}
-    co2.opmode(co2#CONT)
-    co2.measinterval(2)
+    env.reset{}
+    env.opmode(env#CONT)
+    env.measinterval(2)
+    env.tempscale(C)
     repeat
-        repeat until co2.dataready{} == true
-        co2.measure{}
-        coo := fs[0].floattostring(co2.co2data)
-        temp := fs[1].floattostring(co2.tempdata)
-        rh := fs[2].floattostring(co2.humiditydata)
+        repeat until env.dataready{} == true
+        env.measure{}
+        co2 := env.co2ppm{}
+        temp := env.temperature{}
+        rh := env.humidity{}
 
         ser.position(0, 3)
-        ser.printf1(string("CO2: %sppm     \n"), coo)
-        ser.printf1(string("Temp: %sC      \n"), temp)
-        ser.printf1(string("RH: %s%%      \n"), rh)
+        ser.printf1(string("CO2: %sppm     \n"), int2dp(co2, 1))
+        ser.printf1(string("Temp: %s\n"), int2dp(temp, 2))
+        ser.printf1(string("RH: %s%%      \n"), int2dp(rh, 2))
         time.msleep(100)
+
+PRI Int2DP(scaled, places): ptr_dp | whole, part, sign, divisor
+' Convert integer to string, with a decimal point 'places' to the left
+'   Example: Int2DP(314159, 5) would return a pointer to a string
+'       containing "3.14159"
+'   Returns: pointer to string representation of number
+    bytefill(@_tmp_buff, 0, 16)                 ' clear working buffer
+    case places
+        0:                                      ' whole; just return the same
+            return int.dec(scaled)              ' number, as a string
+        1..9:
+            if scaled < 0                       ' determine sign character
+                sign := "-"
+            else
+                sign := " "
+
+            divisor := 1                        ' determine divisor based
+            repeat places                       '   on number of places
+                divisor *= 10
+
+            whole := scaled / divisor           ' whole part of the number
+
+            ' fractional part, with leading zeroes added
+            part := int.deczeroed(||(scaled // divisor), places)
+            ' print formatted string to temporary working buffer
+            sf.sprintf3(@_tmp_buff, string("%c%d.%s"), sign, ||(whole), part)
+            return @_tmp_buff                       ' pointer to buffer
 
 PUB Setup{}
 
@@ -62,7 +97,7 @@ PUB Setup{}
     ser.clear{}
     ser.strln(string("Serial terminal started"))
 
-    if co2.startx(I2C_SCL, I2C_SDA, I2C_HZ)
+    if env.startx(I2C_SCL, I2C_SDA, I2C_HZ)
         ser.strln(string("SCD30 driver started"))
     else
         ser.strln(string("SCD30 driver failed to start - halting"))

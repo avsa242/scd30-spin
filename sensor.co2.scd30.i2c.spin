@@ -5,7 +5,7 @@
     Description: Driver for the Sensirion SCD30 CO2 sensor
     Copyright (c) 2021
     Started Jul 10, 2021
-    Updated Jul 18, 2021
+    Updated Jul 19, 2021
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -27,6 +27,10 @@ CON
 ' Error codes
     EBADCRC         = $E000_0C0C
 
+' Temperature scales
+    C               = 0
+    F               = 1
+
 VAR
 
     long _co2
@@ -34,6 +38,7 @@ VAR
     long _rh
     word _presscomp
     byte _opmode
+    byte _temp_scale
 
 OBJ
 
@@ -42,6 +47,7 @@ OBJ
     core: "core.con.scd30"                      ' hw-specific low-level const's
     time: "time"                                ' basic timing functions
     crc : "math.crc"                            ' CRC routines
+    fm  : "tiny.math.float"                     ' IEEE-754 float functions
 
 PUB Null{}
 ' This is not a top-level object
@@ -97,6 +103,11 @@ PUB CO2Data{}: f_co2
 '   Returns: IEEE-754 float
     return _co2
 
+PUB CO2PPM{}: ppm
+' CO2 concentration, in tenths of a part-per-million
+'   Returns: Integer
+    return fm.ftrunc(fm.fmul(co2data{}, 10.0))
+
 PUB DataReady{}: flag | crc_tmp
 ' Flag indicating data ready
     flag := 0
@@ -111,6 +122,11 @@ PUB DataReady{}: flag | crc_tmp
 
 PUB DeviceID{}: id
 ' Read device identification
+
+PUB Humidity{}: rh
+' Relative humidity, as a percentage
+'   Returns: Integer
+    return fm.ftrunc(fm.fmul(humiditydata{}, 100.0))
 
 PUB HumidityData{}: rh_adc
 ' Relative humidity data
@@ -200,6 +216,24 @@ PUB TempData{}: temp_adc
 '   Returns: IEEE-754 float
     return _temp
 
+PUB TempScale(scale): curr_scale
+' Set temperature scale used by Temperature method
+'   Valid values:
+'       C (0): Celsius
+'       F (1): Fahrenheit
+'   Any other value returns the current setting
+    case scale
+        C, F:
+            _temp_scale := scale
+        other:
+            return _temp_scale
+
+PUB Temperature{}: deg
+' Current Temperature, in hundredths of a degree
+'   Returns: Integer
+'   (e.g., 2105 is equivalent to 21.05 deg C)
+    return calctemp(tempdata{})
+
 PUB Version{}: ver | crc_tmp
 ' Firmware version
 '   Returns: word [MSB:major..LSB:minor]
@@ -213,6 +247,16 @@ PUB Version{}: ver | crc_tmp
         return ver
     else
         return EBADCRC
+
+PRI calcTemp(temp_adc): temp
+' Calculate temperature, given raw temperature data
+    temp := fm.ftrunc(fm.fmul(temp_adc, 100.0)) ' * 100 and convert to integer
+    case _temp_scale
+        C:
+        F:
+            return ((temp * 9_00) / 5_00) + 32_00
+        other:
+            return FALSE
 
 PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt
 ' Read nr_bytes from the device into ptr_buff

@@ -37,6 +37,7 @@ P1/SPIN1:
 
 ## TODO
 
-- [ ] add support for setting temperature scale
-- [ ] add support for integer sensor data return values, as in other drivers
+- [x] add support for setting temperature scale
+- [x] add support for integer sensor data return values, as in other drivers
+- [ ] add support for pure-spin I2C engine
 - [ ] port to P2/SPIN2
