@@ -5,7 +5,7 @@
     Description: Driver for the Sensirion SCD30 CO2 sensor
     Copyright (c) 2021
     Started Jul 10, 2021
-    Updated Jul 19, 2021
+    Updated Jul 20, 2021
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -93,6 +93,30 @@ PUB Present{}: ack
     ack := i2c.write(SLAVE_WR)
     i2c.stop{}                                  ' P: SCD30 doesn't support Sr
     return (ack == i2c#ACK)                     ' return TRUE if present
+
+PUB AltComp(alt): curr_alt | crc_tmp
+' Compensate CO2 measurements based on altitude, in meters
+'   Valid values: 0..65535
+'   Any other value polls the chip and returns the current setting
+'   NOTE: This setting is disregarded when ambient pressure is set
+'   NOTE: This setting is stored in the sensor in non-volatile memory,
+'       i.e., it will save even if power is lost
+    curr_alt := 0
+    readreg(core#ALTITUDECOMP, 3, @curr_alt)
+    case alt
+        0..65535:
+            ' generate CRC of data
+            crc_tmp := crc.sensirioncrc8(@alt, 2)
+            alt <<= 8
+            alt.byte[0] := crc_tmp            ' tack it on to the data
+            writereg(core#ALTITUDECOMP, 3, @alt)
+        other:
+            crc_tmp := curr_alt.byte[0]
+            curr_alt >>= 8
+            if crc.sensirioncrc8(@curr_alt, 2) == crc_tmp
+                return curr_alt
+            else
+                return EBADCRC
 
 PUB AmbPressure(press): curr_press
 ' Set ambient pressure, in millibars, for use in on-sensor compensation
