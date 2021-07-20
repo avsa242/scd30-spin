@@ -131,6 +131,35 @@ PUB AmbPressure(press): curr_press
         other:
             return _presscomp
 
+PUB AutoCal(state): curr_state | crc_tmp
+' Enable automatic self-calibration
+'   Valid values: TRUE (-1 or 1), *FALSE (0)
+'   Any other value polls the chip and returns the current setting
+'   NOTE: This process requires the following in order to be successful:
+'       1) The sensor must be powered continuously for a minimum of 7 days
+'           (if power is removed, the process will abort and must be restarted)
+'       2) The sensor should be exposed to fresh air for approx 1 hr every day
+'       3) The sensor must be set to continuous measurement mode
+'   NOTE: The calibration result is saved in non-volatile memory,
+'       i.e., it will save even if power is lost (after completion)
+    curr_state := 0
+    readreg(core#AUTOSELFCAL, 3, @curr_state)
+    case ||(state)
+        0, 1:
+            ' generate CRC of data
+            state := ||(state)
+            crc_tmp := crc.sensirioncrc8(@state, 2)
+            state <<= 8
+            state.byte[0] := crc_tmp            ' tack it on to the data
+            writereg(core#AUTOSELFCAL, 3, @state)
+        other:
+            crc_tmp := curr_state.byte[0]
+            curr_state >>= 8
+            if crc.sensirioncrc8(@curr_state, 2) == crc_tmp
+                return (curr_state == 1)
+            else
+                return EBADCRC
+
 PUB CO2Data{}: f_co2
 ' CO2 data
 '   Returns: IEEE-754 float
