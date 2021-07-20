@@ -42,5 +42,5 @@ P1/SPIN1:
 - [x] add support for pure-spin I2C engine
 - [x] add support for altitude compensation
 - [x] add support for (de)activating automatic self-calibration
-- [ ] add support for setting forced recalibration value
+- [x] add support for setting forced recalibration value
 - [ ] port to P2/SPIN2

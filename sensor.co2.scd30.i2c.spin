@@ -160,6 +160,28 @@ PUB AutoCal(state): curr_state | crc_tmp
             else
                 return EBADCRC
 
+PUB CO2Bias(ppm): curr_ppm | crc_tmp
+' Manually set calibration/reference level of CO2 sensor
+'   Valid values: 400..2000
+'   Any other value polls the chip and returns the current setting
+'   NOTE: The calibration value is saved in volatile memory,
+'       i.e., it will not save if power is lost
+    curr_ppm := 0
+    readreg(core#SETRECALVAL, 3, @curr_ppm)
+    case ppm
+        400..2000:
+            crc_tmp := crc.sensirioncrc8(@ppm, 2)
+            ppm <<= 8
+            ppm.byte[0] := crc_tmp            ' tack it on to the data
+            writereg(core#SETRECALVAL, 3, @ppm)
+        other:
+            crc_tmp := curr_ppm.byte[0]
+            curr_ppm >>= 8
+            if crc.sensirioncrc8(@curr_ppm, 2) == crc_tmp
+                return curr_ppm
+            else
+                return EBADCRC
+
 PUB CO2Data{}: f_co2
 ' CO2 data
 '   Returns: IEEE-754 float
