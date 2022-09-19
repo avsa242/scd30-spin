@@ -5,7 +5,7 @@
     Description: Driver for the Sensirion SCD30 CO2 sensor (P2 version)
     Copyright (c) 2022
     Started Jul 21, 2021
-    Updated Aug 7, 2022
+    Updated Sep 19, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -66,6 +66,8 @@ PUB startx(SCL_PIN, SDA_PIN, I2C_HZ=DEF_HZ): status
 PUB stop()
 ' Stop the driver
     i2c.deinit()
+    longfill(@_co2, 0, 3)
+    bytefill(@_presscomp, 0, 3)
 
 PUB defaults()
 ' Set factory defaults
@@ -269,7 +271,7 @@ PRI read_meas() | meas_tmp[5], crc_tmp
 }   crc.sensirioncrc8(@_rh, 2) == crc_tmp.byte[0]
         return EBADCRC
 
-PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp_buff, crc_tmp
+PRI readreg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp_buff, crc_tmp
 ' Read nr_bytes from the device into ptr_buff
     case reg_nr                                 ' validate register num
         core.GETDRDY, core.FWVER, core.SETMEASINTERV, {
@@ -317,7 +319,7 @@ PRI readReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp_buff, crc_tmp
         other:                                  ' invalid reg_nr
             return
 
-PRI writeReg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, dat_tmp
+PRI writereg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, dat_tmp
 ' Write nr_bytes to the device from ptr_buff
     cmd_pkt.byte[0] := SLAVE_WR
     cmd_pkt.byte[1] := reg_nr.byte[1]
