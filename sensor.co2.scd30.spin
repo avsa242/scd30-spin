@@ -5,7 +5,7 @@
     Description: Driver for the Sensirion SCD30 CO2 sensor
     Copyright (c) 2022
     Started Jul 10, 2021
-    Updated Oct 3, 2022
+    Updated Oct 16, 2022
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -261,8 +261,8 @@ PRI read_meas{} | meas_tmp[5], crc_tmp
     _co2.byte[0] := meas_tmp.byte[13]
     crc_tmp.byte[0] := meas_tmp.byte[12]
 
-    ifnot crc.sensirioncrc8(@_co2.byte[2], 2) == crc_tmp.byte[1] and {
-}   crc.sensirioncrc8(@_co2, 2) == crc_tmp.byte[0]
+    ifnot crc.sensirion_crc8(@_co2.byte[2], 2) == crc_tmp.byte[1] and {
+}   crc.sensirion_crc8(@_co2, 2) == crc_tmp.byte[0]
         return EBADCRC
 
     _temp.byte[3] := meas_tmp.byte[11]
@@ -272,8 +272,8 @@ PRI read_meas{} | meas_tmp[5], crc_tmp
     _temp.byte[0] := meas_tmp.byte[7]
     crc_tmp.byte[0] := meas_tmp.byte[6]
 
-    ifnot crc.sensirioncrc8(@_temp.byte[2], 2) == crc_tmp.byte[1] and {
-}   crc.sensirioncrc8(@_temp, 2) == crc_tmp.byte[0]
+    ifnot crc.sensirion_crc8(@_temp.byte[2], 2) == crc_tmp.byte[1] and {
+}   crc.sensirion_crc8(@_temp, 2) == crc_tmp.byte[0]
         return EBADCRC
 
     _rh.byte[3] := meas_tmp.byte[5]
@@ -283,8 +283,8 @@ PRI read_meas{} | meas_tmp[5], crc_tmp
     _rh.byte[0] := meas_tmp.byte[1]
     crc_tmp.byte[0] := meas_tmp.byte[0]
 
-    ifnot crc.sensirioncrc8(@_rh.byte[2], 2) == crc_tmp.byte[1] and {
-}   crc.sensirioncrc8(@_rh, 2) == crc_tmp.byte[0]
+    ifnot crc.sensirion_crc8(@_rh.byte[2], 2) == crc_tmp.byte[1] and {
+}   crc.sensirion_crc8(@_rh, 2) == crc_tmp.byte[0]
         return EBADCRC
 
 PRI readreg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp_buff, crc_tmp
@@ -311,7 +311,7 @@ PRI readreg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp_buff, crc_tmp
 
             crc_tmp := tmp_buff.byte[0]
             tmp_buff >>= 8
-            if crc.sensirioncrc8(@tmp_buff, 2) == crc_tmp
+            if crc.sensirion_crc8(@tmp_buff, 2) == crc_tmp
                 bytemove(ptr_buff, @tmp_buff, 2)
                 return
             else
@@ -345,7 +345,7 @@ PRI writereg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, dat_tmp
 }       core#SETRECALVAL, core#AUTOSELFCAL, core#SETTEMPOFFS:
             dat_tmp := long[ptr_buff]
             dat_tmp <<= 8
-            dat_tmp.byte[0] := crc.sensirioncrc8(@dat_tmp.byte[1], 2)
+            dat_tmp.byte[0] := crc.sensirion_crc8(@dat_tmp.byte[1], 2)
             i2c.start{}
             i2c.wrblock_lsbf(@cmd_pkt, 3)
 
