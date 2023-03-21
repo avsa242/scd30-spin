@@ -3,9 +3,9 @@
     Filename: sensor.co2.scd30.spin
     Author: Jesse Burt
     Description: Driver for the Sensirion SCD30 CO2 sensor
-    Copyright (c) 2022
+    Copyright (c) 2023
     Started Jul 10, 2021
-    Updated Oct 31, 2022
+    Updated Mar 21, 2023
     See end of file for terms of use.
     --------------------------------------------
 }
@@ -46,14 +46,14 @@ OBJ
 
 { decide: Bytecode I2C engine, or PASM? Default is PASM if BC isn't specified }
 #ifdef SCD30_I2C_BC
-    i2c : "com.i2c.nocog"                       ' BC I2C engine
+    i2c:    "com.i2c.nocog"                     ' BC I2C engine
 #else
-    i2c : "com.i2c"                             ' PASM I2C engine
+    i2c:    "com.i2c"                           ' PASM I2C engine
 #endif
-    core: "core.con.scd30"                      ' hw-specific low-level const's
-    time: "time"                                ' basic timing functions
-    crc : "math.crc"                            ' CRC routines
-    fm  : "math.float.nocog"                    ' IEEE-754 float functions
+    core:   "core.con.scd30"                    ' hw-specific low-level const's
+    time:   "time"                              ' basic timing functions
+    crc:    "math.crc"                          ' CRC routines
+    fm:     "math.float.nocog"                  ' IEEE-754 float functions
 
 PUB null{}
 ' This is not a top-level object
@@ -86,7 +86,7 @@ PUB defaults{}
     reset{}
 
 PUB preset_active{}
-' Like defaults{}, but sets continuous measurement mode, with 2sec interval
+' Like defaults(), but sets continuous measurement mode, with 2sec interval
     reset{}
     opmode(CONT)
     meas_interval(2)
@@ -106,7 +106,7 @@ PUB adc2co2(adc_word): co2
 PUB co2_alt_comp{}: alt
 ' Get altitude compensation value
 '   Returns: meters
-    readreg(core#ALTITUDECOMP, 3, @alt)
+    readreg(core#ALTITUDECOMP, 1, @alt)
     return alt
 
 PUB co2_set_alt_comp(alt)
@@ -146,7 +146,7 @@ PUB auto_cal_ena(state): curr_state
 '   NOTE: The calibration result is saved in non-volatile memory,
 '       i.e., it will save even if power is lost (after completion)
     curr_state := 0
-    readreg(core#AUTOSELFCAL, 3, @curr_state)
+    readreg(core#AUTOSELFCAL, 1, @curr_state)
     case ||(state)
         0, 1:
             state := ||(state)
@@ -161,7 +161,7 @@ PUB co2_bias(ppm): curr_ppm
 '   NOTE: The calibration value is saved in volatile memory,
 '       i.e., it will not save if power is lost
     curr_ppm := 0
-    readreg(core#SETRECALVAL, 3, @curr_ppm)
+    readreg(core#SETRECALVAL, 1, @curr_ppm)
     case ppm
         400..2000:
             writereg(core#SETRECALVAL, 3, @ppm)
@@ -179,7 +179,7 @@ PUB co2_data{}: f_co2
 PUB co2_data_rdy{}: flag
 ' Flag indicating data ready
     flag := 0
-    readreg(core#GETDRDY, 3, @flag)
+    readreg(core#GETDRDY, 1, @flag)
 
     return ((flag & 1) == 1)
 
@@ -191,7 +191,7 @@ PUB meas_interval(t_int): curr_t
 '   Valid values: 2..1800
 '   Any other value returns the current setting
     curr_t := 0
-    readreg(core#SETMEASINTERV, 3, @curr_t)
+    readreg(core#SETMEASINTERV, 1, @curr_t)
     case t_int
         2..1800:
             writereg(core#SETMEASINTERV, 3, @t_int)
@@ -248,51 +248,26 @@ PUB version{}: ver
 '   Returns: word [MSB:major..LSB:minor]
 '   Known values: $03_42
     ver := 0
-    readreg(core#FWVER, 3, @ver)
+    readreg(core#FWVER, 1, @ver)
 
-PRI read_meas{} | meas_tmp[5], crc_tmp
+PRI read_meas{}: status | meas_tmp[3]
 ' Read measurements and cache in RAM
 '   NOTE: Valid data will be returned only if the data_rdy{} signal is TRUE
-    readreg(core#READMEAS, 18, @meas_tmp)
-    _co2.byte[3] := meas_tmp.byte[17]
-    _co2.byte[2] := meas_tmp.byte[16]
-    crc_tmp.byte[1] := meas_tmp.byte[15]
-    _co2.byte[1] := meas_tmp.byte[14]
-    _co2.byte[0] := meas_tmp.byte[13]
-    crc_tmp.byte[0] := meas_tmp.byte[12]
+    longfill(@meas_tmp, 0, 3)
+    status := readreg(core#READMEAS, 6, @meas_tmp)
+    if ( status == 0 )
+        _co2 := (meas_tmp.word[0] << 16) | meas_tmp.word[1]
+        _temp := (meas_tmp.word[2] << 16) | meas_tmp.word[3]
+        _rh := (meas_tmp.word[4] << 16) | meas_tmp.word[5]
+    else
+        return                                  ' pass through the error from readreg
 
-    ifnot crc.sensirion_crc8(@_co2.byte[2], 2) == crc_tmp.byte[1] and {
-}   crc.sensirion_crc8(@_co2, 2) == crc_tmp.byte[0]
-        return EBADCRC
-
-    _temp.byte[3] := meas_tmp.byte[11]
-    _temp.byte[2] := meas_tmp.byte[10]
-    crc_tmp.byte[1] := meas_tmp.byte[9]
-    _temp.byte[1] := meas_tmp.byte[8]
-    _temp.byte[0] := meas_tmp.byte[7]
-    crc_tmp.byte[0] := meas_tmp.byte[6]
-
-    ifnot crc.sensirion_crc8(@_temp.byte[2], 2) == crc_tmp.byte[1] and {
-}   crc.sensirion_crc8(@_temp, 2) == crc_tmp.byte[0]
-        return EBADCRC
-
-    _rh.byte[3] := meas_tmp.byte[5]
-    _rh.byte[2] := meas_tmp.byte[4]
-    crc_tmp.byte[1] := meas_tmp.byte[3]
-    _rh.byte[1] := meas_tmp.byte[2]
-    _rh.byte[0] := meas_tmp.byte[1]
-    crc_tmp.byte[0] := meas_tmp.byte[0]
-
-    ifnot crc.sensirion_crc8(@_rh.byte[2], 2) == crc_tmp.byte[1] and {
-}   crc.sensirion_crc8(@_rh, 2) == crc_tmp.byte[0]
-        return EBADCRC
-
-PRI readreg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp_buff, crc_tmp
-' Read nr_bytes from the device into ptr_buff
+PRI readreg(reg_nr, nr_words, ptr_buff): status | cmd_pkt, tmp_buff, crc_tmp, rd_wd, last_wd, dptr
+' Read nr_words from the device into ptr_buff
     case reg_nr                                 ' validate register num
         core#GETDRDY, core#FWVER, core#SETMEASINTERV, {
 }       core#AUTOSELFCAL, core#SETRECALVAL, core#SETTEMPOFFS, {
-}       core#ALTITUDECOMP:
+}       core#ALTITUDECOMP, core#READMEAS:
             cmd_pkt.byte[0] := SLAVE_WR
             cmd_pkt.byte[1] := reg_nr.byte[1]
             cmd_pkt.byte[2] := reg_nr.byte[0]
@@ -305,35 +280,22 @@ PRI readreg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, tmp_buff, crc_tmp
             i2c.start{}
             i2c.wr_byte(SLAVE_RD)
 
-            ' read MSByte to LSByte
-            i2c.rdblock_msbf(@tmp_buff, nr_bytes, i2c#NAK)
+            dptr := ptr_buff
+            last_wd := (nr_words-1)
+            repeat rd_wd from 0 to last_wd
+                tmp_buff := i2c.rdword_msbf(i2c#ACK)
+                { Is this the last word to read? Send the sensor a NAK; otherwise, send ACK }
+                crc_tmp := i2c.rd_byte(rd_wd == last_wd)
+                if ( crc.sensirion_crc8(@tmp_buff, 2) == crc_tmp )
+                    word[dptr] := tmp_buff      ' data is good - copy it to the caller
+                    dptr += 2
+                else
+                    i2c.stop{}
+                    return EBADCRC              ' data read failed CRC
             i2c.stop{}
-
-            crc_tmp := tmp_buff.byte[0]
-            tmp_buff >>= 8
-            if crc.sensirion_crc8(@tmp_buff, 2) == crc_tmp
-                bytemove(ptr_buff, @tmp_buff, 2)
-                return
-            else
-                return
-        core#READMEAS:
-            cmd_pkt.byte[0] := SLAVE_WR
-            cmd_pkt.byte[1] := reg_nr.byte[1]
-            cmd_pkt.byte[2] := reg_nr.byte[0]
-            i2c.start{}
-            i2c.wrblock_lsbf(@cmd_pkt, 3)
-            i2c.stop{}                          ' P: SCD30 doesn't support Sr
-
-            time.usleep(core#T_WRRD)            ' wait between write and read
-
-            i2c.start{}
-            i2c.wr_byte(SLAVE_RD)
-
-            ' read MSByte to LSByte
-            i2c.rdblock_msbf(ptr_buff, nr_bytes, i2c#NAK)
-            i2c.stop{}
-        other:                                  ' invalid reg_nr
-            return
+            return 0                            ' success
+        other:
+            return                              ' invalid reg_nr
 
 PRI writereg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, dat_tmp, crc_tmp
 ' Write nr_bytes to the device from ptr_buff
@@ -362,7 +324,7 @@ PRI writereg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, dat_tmp, crc_tmp
 
 DAT
 {
-Copyright 2022 Jesse Burt
+Copyright 2023 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
