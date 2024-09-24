@@ -1,13 +1,12 @@
 {
-    --------------------------------------------
-    Filename: core.con.scd30.spin
-    Author: Jesse Burt
-    Description: SCD30-specific low-level constants
-    Copyright (c) 2021
-    Started Jul 10, 2021
-    Updated Jul 18, 2021
-    See end of file for terms of use.
-    --------------------------------------------
+----------------------------------------------------------------------------------------------------
+    Filename:       core.con.scd30.spin
+    Description:    SCD30-specific constants
+    Author:         Jesse Burt
+    Started:        Jul 10, 2021
+    Updated:        Sep 24, 2024
+    Copyright (c) 2024 - See end of file for terms of use.
+----------------------------------------------------------------------------------------------------
 }
 
 CON
@@ -32,12 +31,14 @@ CON
     FWVER           = $D100
     SOFTRESET       = $D304
 
-PUB Null{}
+
+PUB null()
 ' This is not a top-level object
+
 
 DAT
 {
-Copyright 2022 Jesse Burt
+Copyright 2024 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,

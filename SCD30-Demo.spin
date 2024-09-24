@@ -1,64 +1,63 @@
 {
-    --------------------------------------------
-    Filename: SCD30-Demo.spin
-    Author: Jesse Burt
-    Description: SCD30 driver demo
+----------------------------------------------------------------------------------------------------
+    Filename:       SCD30-Demo.spin
+    Description:    SCD30 driver demo
         * CO2 data output
-    Copyright (c) 2022
-    Started Jul 10, 2021
-    Updated Oct 16, 2022
-    See end of file for terms of use.
-    --------------------------------------------
-
-    Build-time symbols supported by driver:
-        -DQUIRK_SCD30 (patch to PASM I2C engine, if used)
-        -DSCD30_I2C (default if none specified)
-        -DSCD30_I2C_BC
+    Author:         Jesse Burt
+    Started:        Jul 10, 2021
+    Updated:        Sep 24, 2024
+    Copyright (c) 2024 - See end of file for terms of use.
+----------------------------------------------------------------------------------------------------
 }
+
+' Uncomment the two lines below to use the bytecode-based I2C engine in the driver:
+'#define SCD30_I2C_BC
+'#pragma exportdef(SCD30_I2C_BC)
+
+
 CON
 
-    _clkmode    = cfg#_clkmode
-    _xinfreq    = cfg#_xinfreq
+    _clkmode    = xtal1+pll16x
+    _xinfreq    = 5_000_000
 
-' -- User-modifiable constants
-    SER_BAUD    = 115_200
-
-    { I2C configuration }
-    SCL_PIN     = 28
-    SDA_PIN     = 29
-    I2C_FREQ    = 100_000                       ' max is 100_000
-                                                ' (Sensirion recommends 50_000)
-
-' --
 
 OBJ
 
-    cfg: "boardcfg.flip"
-    env: "sensor.co2.scd30"
-    ser: "com.serial.terminal.ansi"
-    time: "time"
+    sensor: "sensor.co2.scd30" | SCL=28, SDA=29, I2C_FREQ=100_000
+    ser:    "com.serial.terminal.ansi" | SER_BAUD=115_200
+    time:   "time"
 
-PUB setup{}
 
-    ser.start(SER_BAUD)
-    time.msleep(20)
-    ser.clear{}
-    ser.strln(string("Serial terminal started"))
+PUB main() | co2
 
-    if (env.startx(SCL_PIN, SDA_PIN, I2C_FREQ))
-        ser.strln(string("SCD30 driver started"))
+    setup()
+
+    repeat
+        ser.pos_xy(0, 3)
+        sensor.measure()
+        co2 := sensor.co2ppm()
+        ser.printf2(@"CO2 (ppm): %5.5d.%0d\n\r", (co2 / 10), (co2 // 10))
+
+
+PUB setup()
+
+    ser.start()
+    time.msleep(30)
+    ser.clear()
+    ser.strln(@"Serial terminal started")
+
+    if ( sensor.start() )
+        ser.strln(@"SCD30 driver started")
     else
-        ser.strln(string("SCD30 driver failed to start - halting"))
+        ser.strln(@"SCD30 driver failed to start - halting")
         repeat
 
-    env.preset_active{}
-    demo{}
+    sensor.preset_active()
 
-#include "co2demo.common.spinh"                 ' code common to all CO2 demos
 
 DAT
 {
-Copyright 2022 Jesse Burt
+Copyright 2024 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
