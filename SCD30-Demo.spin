@@ -5,8 +5,8 @@
         * CO2 data output
     Author:         Jesse Burt
     Started:        Jul 10, 2021
-    Updated:        Sep 24, 2024
-    Copyright (c) 2024 - See end of file for terms of use.
+    Updated:        May 23, 2025
+    Copyright (c) 2025 - See end of file for terms of use.
 ----------------------------------------------------------------------------------------------------
 }
 
@@ -36,7 +36,7 @@ PUB main() | co2
         ser.pos_xy(0, 3)
         sensor.measure()
         co2 := sensor.co2ppm()
-        ser.printf2(@"CO2 (ppm): %5.5d.%0d\n\r", (co2 / 10), (co2 // 10))
+        ser.printf(@"CO2 (ppm): %5.5d.%0d\n\r", (co2 / 10), (co2 // 10) )
 
 
 PUB setup()
@@ -57,7 +57,7 @@ PUB setup()
 
 DAT
 {
-Copyright 2024 Jesse Burt
+Copyright 2025 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,

@@ -96,56 +96,51 @@ PUB preset_active()
     meas_interval(2)
 
 
-PUB present(): ack
+PUB present(): p
 ' Test device bus presence
-    ack := 0
+    p := 0
     i2c.start()
-    ack := i2c.write(SLAVE_WR)
+    p := i2c.write(SLAVE_WR)
     i2c.stop()                                  ' P: SCD30 doesn't support Sr
-    return (ack == i2c.ACK)                     ' return TRUE if present
+    return (p == i2c.ACK)                       ' return TRUE if present
 
 
-PUB adc2co2(adc_word): co2
+PUB adc2co2(w): c
 ' Convert ADC word to CO2 data
-    return fm.ftrunc(fm.fmul(adc_word, 10.0))
+    return fm.ftrunc( fm.fmul(w, 10.0) )
 
 
-PUB co2_alt_comp(): alt
+PUB co2_alt_comp(): c
 ' Get altitude compensation value
 '   Returns: meters
-    readreg(core.ALTITUDECOMP, 1, @alt)
-    return alt
+    return readreg(core.ALTITUDECOMP, 1)
 
 
-PUB co2_set_alt_comp(alt)
+PUB co2_set_alt_comp(a)
 ' Compensate CO2 measurements based on altitude, in meters
 '   Valid values: 0..65535 (clamped to range)
 '   NOTE: This setting is disregarded when ambient pressure is set
 '   NOTE: This setting is stored in the sensor in non-volatile memory,
 '       i.e., it will save even if power is lost
-    alt := 0 #> alt <# 65535
-    writereg(core.ALTITUDECOMP, 3, @alt)
+    writereg(core.ALTITUDECOMP, (0 #> a <# 65535), 3)
 
 
-PUB co2_amb_press_comp(press): curr_press
+PUB co2_amb_press_comp(p): c
 ' Get ambient pressure compensation value (MCU RAM)
 '   Returns: millibars
     return _presscomp
 
 
-PUB co2_set_amb_press_comp(press)
+PUB co2_set_amb_press_comp(p)
 ' Set ambient pressure, in millibars, for use in on-sensor compensation (MCU RAM)
 '   Valid values:
 '       0: disable compensation
 '       700..1400 (clamped to range)
-'   NOTE: To effect settings, OpMode(CONT) must be called
-    ifnot (press)
-        _presscomp := 0
-    else
-        _presscomp := 700 #> press <# 1400
+'   NOTE: To effect settings, opmode(CONT) must be called
+    _presscomp := 700 #(> p <# 1400)
 
 
-PUB auto_cal_ena(state=-2): curr_state
+PUB auto_cal_ena(s=-2): c
 ' Enable automatic self-calibration
 '   Valid values: TRUE (-1 or 1), *FALSE (0)
 '   Any other value polls the chip and returns the current setting
@@ -156,130 +151,120 @@ PUB auto_cal_ena(state=-2): curr_state
 '       3) The sensor must be set to continuous measurement mode
 '   NOTE: The calibration result is saved in non-volatile memory,
 '       i.e., it will save even if power is lost (after completion)
-    curr_state := 0
-    readreg(core.AUTOSELFCAL, 1, @curr_state)
-    case abs(state)
+    case abs(s)
         0, 1:
-            state := abs(state)
-            writereg(core.AUTOSELFCAL, 3, @state)
+            writereg(core.AUTOSELFCAL, abs(s), 3)
         other:
-            return (curr_state == 1)
+            return ( readreg(core.AUTOSELFCAL, 1) == 1 )
 
 
-PUB co2_bias(ppm=-2): curr_ppm
+PUB co2_bias(b=-2): c
 ' Manually set calibration/reference level of CO2 sensor
 '   Valid values: 400..2000
 '   Any other value polls the chip and returns the current setting
 '   NOTE: The calibration value is saved in volatile memory,
 '       i.e., it will not save if power is lost
-    curr_ppm := 0
-    readreg(core.SETRECALVAL, 1, @curr_ppm)
-    case ppm
+    case b
         400..2000:
-            writereg(core.SETRECALVAL, 3, @ppm)
+            writereg(core.SETRECALVAL, b, 3)
         other:
-            return curr_ppm
+            c := readreg(core.SETRECALVAL, 1)
+            return c
 
 
-PUB co2_data(): f_co2
+PUB co2_data(): d
 ' CO2 data
 '   Returns: IEEE-754 float
-    if (co2_data_rdy())
+    if ( co2_data_rdy() )
         read_meas()
     else
         return _co2
 
 
-PUB co2_data_rdy(): flag
+PUB co2_data_rdy(): f
 ' Flag indicating data ready
-    flag := 0
-    readreg(core.GETDRDY, 1, @flag)
-
-    return ((flag & 1) == 1)
+    f := readreg(core.GETDRDY, 1)
+    return ( (f & 1) == 1 )
 
 
 PUB measure()
 ' dummy method
 
 
-PUB meas_interval(t_int=-2): curr_t
+PUB meas_interval(i=-2): c
 ' Set measurement interval, in seconds
 '   Valid values: 2..1800
 '   Any other value returns the current setting
-    curr_t := 0
-    readreg(core.SETMEASINTERV, 1, @curr_t)
-    case t_int
+    case i
         2..1800:
-            writereg(core.SETMEASINTERV, 3, @t_int)
+            writereg(core.SETMEASINTERV, i, 3)
         other:
-            return curr_t
+            return readreg(core.SETMEASINTERV, 1)
 
 
-PUB opmode(mode=-2): curr_mode
+PUB opmode(m=-2): c
 ' Set operating mode
 '   Valid values:
 '      *STANDBY (0): stop measuring
 '       CONT (1): continuous measurement
 '   Any other value returns the current setting
-    curr_mode := _opmode
-    case mode
+    case m
         CONT:
-            writereg(core.CONTMEAS, 2, @_presscomp)
+            writereg(core.CONTMEAS, _presscomp, 2)
         STANDBY:
-            writereg(core.STOPMEAS, 0, 0)
+            command(core.STOPMEAS)
         other:
-            return curr_mode
-    _opmode := mode
+            return _opmode
+    _opmode := m
 
 
 PUB reset()
 ' Reset the device
-    writereg(core.SOFTRESET, 0, 0)
+    command(core.SOFTRESET)
     waitus(core.T_RES)
 
 
-PUB rh_data(): rh_adc
+PUB rh_data(): d
 ' Relative humidity data
 '   Returns: IEEE-754 float
-    if (co2_data_rdy())
+    if ( co2_data_rdy() )
         read_meas()
     else
         return _rh
 
 
-PUB rh_word2pct(adc_word): rh
+PUB rh_word2pct(w): r
 ' Convert ADC word to RH data
-    return fm.ftrunc(fm.fmul(adc_word, 100.0))
+    return fm.ftrunc( fm.fmul(w, 100.0) )
 
 
-PUB temp_data(): temp_adc
+PUB temp_data(): d
 ' Temperature data
 '   Returns: IEEE-754 float
-    if (co2_data_rdy())
+    if ( co2_data_rdy() )
         read_meas()
     else
         return _temp
 
 
-PUB temp_word2deg(adc_word): temp
+PUB temp_word2deg(w): t
 ' Convert ADC word to temperature data
-    return fm.ftrunc(fm.fmul(adc_word, 100.0))
+    return fm.ftrunc(fm.fmul(w, 100.0) )
 
 
-PUB version(): ver
+PUB version(): v
 ' Firmware version
 '   Returns: word [MSB:major..LSB:minor]
 '   Known values: $03_42
-    ver := 0
-    readreg(core.FWVER, 1, @ver)
+    return readreg(core.FWVER, 1)
 
 
-PRI read_meas(): status | meas_tmp[3]
+PRI read_meas(): s | meas_tmp[3]
 ' Read measurements and cache in RAM
 '   NOTE: Valid data will be returned only if the data_rdy() signal is TRUE
     longfill(@meas_tmp, 0, 3)
-    status := readreg(core.READMEAS, 6, @meas_tmp)
-    if ( status == 0 )
+    s := readreg(core.READMEAS, 6, @meas_tmp)
+    if ( s == 0 )                               ' status good? update the measurements in RAM
         _co2 := (meas_tmp.word[0] << 16) | meas_tmp.word[1]
         _temp := (meas_tmp.word[2] << 16) | meas_tmp.word[3]
         _rh := (meas_tmp.word[4] << 16) | meas_tmp.word[5]
@@ -287,65 +272,63 @@ PRI read_meas(): status | meas_tmp[3]
         return                                  ' pass through the error from readreg
 
 
-PRI readreg(reg_nr, nr_words, ptr_buff): status | cmd_pkt, tmp_buff, crc_tmp, rd_wd, last_wd, dptr
-' Read nr_words from the device into ptr_buff
-    case reg_nr                                 ' validate register num
-        core.GETDRDY, core.FWVER, core.SETMEASINTERV, core.AUTOSELFCAL, core.SETRECALVAL, ...
-        core.SETTEMPOFFS, core.ALTITUDECOMP, core.READMEAS:
-            cmd_pkt.byte[0] := SLAVE_WR
-            cmd_pkt.byte[1] := reg_nr.byte[1]
-            cmd_pkt.byte[2] := reg_nr.byte[0]
-            i2c.start()
-            i2c.wrblock_lsbf(@cmd_pkt, 3)
-            i2c.stop()                          ' P: SCD30 doesn't support Sr
-
-            waitus(core.T_WRRD)                 ' wait between write and read
-
-            i2c.start()
-            i2c.wr_byte(SLAVE_RD)
-
-            dptr := ptr_buff
-            last_wd := (nr_words-1)
-            repeat rd_wd from 0 to last_wd
-                tmp_buff := i2c.rdword_msbf(i2c.ACK)
-                { Is this the last word to read? Send the sensor a NAK; otherwise, send ACK }
-                crc_tmp := i2c.rd_byte(rd_wd == last_wd)
-                if ( crc.sensirion_crc8(@tmp_buff, 2) == crc_tmp )
-                    word[dptr] := tmp_buff      ' data is good - copy it to the caller
-                    dptr += 2
-                else
-                    i2c.stop()
-                    return EBADCRC              ' data read failed CRC
-            i2c.stop()
-            return 0                            ' success
-        other:
-            return                              ' invalid reg_nr
-
-
-PRI writereg(reg_nr, nr_bytes, ptr_buff) | cmd_pkt, dat_tmp, crc_tmp
-' Write nr_bytes to the device from ptr_buff
+PRI readreg(reg_nr, len, p_dest=0): v | cmd_pkt, tmp, crc_tmp, rd_wd, last_wd
+' Read register value(s)
+'   reg_nr:     register number
+'   len:        length/number of 16-bit words to read
+'   p_dest:     pointer to destination buffer (only used if reg_nr == READMEAS)
+'   Returns:    value stored in register (only used if reg_nr <> READMEAS)
     cmd_pkt.byte[0] := SLAVE_WR
     cmd_pkt.byte[1] := reg_nr.byte[1]
     cmd_pkt.byte[2] := reg_nr.byte[0]
+    i2c.start()
+    i2c.wrblock_lsbf(@cmd_pkt, 3)
+    i2c.stop()                                  ' P: SCD30 doesn't support Sr
+
+    waitus(core.T_WRRD)                         ' wait between write and read
+
+    i2c.start()
+    i2c.wr_byte(SLAVE_RD)
+
+
+    last_wd := (len-1)
+    repeat rd_wd from 0 to last_wd
+        tmp := i2c.rdword_msbf(i2c.ACK)
+        crc_tmp := i2c.rd_byte(rd_wd == last_wd)' send ACK until reaching the last data
+        if ( crc.sensirion_crc8(@tmp, 2) == crc_tmp )
+            if ( reg_nr == core.READMEAS )
+                word[p_dest] := tmp        ' data is good - copy it to the caller
+                p_dest += 2
+            else
+                v := tmp
+        else
+            i2c.stop()
+            return EBADCRC                      ' data read failed CRC
+    i2c.stop()
+
+
+PRI command = writereg
+PRI writereg(reg_nr, val=0, len=1) | cmd_pkt, dat_tmp, crc_tmp
+' Write value to register
+'   reg_nr:     register number
+'   val:        value to write (optional; default is 0)
+'   len:        length/number of bytes to write (optional; default is 1)
+    cmd_pkt.byte[0] := SLAVE_WR
+    cmd_pkt.byte[1] := reg_nr.byte[1]
+    cmd_pkt.byte[2] := reg_nr.byte[0]
+    i2c.start()
+    i2c.wrblock_lsbf(@cmd_pkt, 3)
+
     case reg_nr
-        core.CONTMEAS, core.STOPMEAS, core.SETMEASINTERV, core.ALTITUDECOMP, core.SETRECALVAL, ...
+        core.CONTMEAS, core.SETMEASINTERV, core.ALTITUDECOMP, core.SETRECALVAL, ...
         core.AUTOSELFCAL, core.SETTEMPOFFS:
-            dat_tmp := long[ptr_buff]
+            dat_tmp := val
             dat_tmp <<= 8
             crc_tmp := dat_tmp.byte[1]
             dat_tmp.byte[0] := crc.sensirion_crc8(@crc_tmp, 2)
-            i2c.start()
-            i2c.wrblock_lsbf(@cmd_pkt, 3)
+            i2c.wrblock_msbf(@dat_tmp, len)
 
-            ' write MSByte to LSByte
-            i2c.wrblock_msbf(@dat_tmp, nr_bytes)
-            i2c.stop()
-        core.STOPMEAS, core.SOFTRESET:
-            i2c.start()
-            i2c.wrblock_lsbf(@cmd_pkt, 3)
-            i2c.stop()
-        other:
-            return
+    i2c.stop()
 
 DAT
 {
