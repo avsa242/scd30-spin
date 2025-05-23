@@ -4,8 +4,8 @@
     Description:    Driver for the Sensirion SCD30 CO2 sensor
     Author:         Jesse Burt
     Started:        Jul 21, 2021
-    Updated:        Sep 24, 2024
-    Copyright (c) 2024 - See end of file for terms of use.
+    Updated:        May 23, 2025
+    Copyright (c) 2025 - See end of file for terms of use.
 ----------------------------------------------------------------------------------------------------
 }
 
@@ -137,7 +137,7 @@ PUB co2_set_amb_press_comp(p)
 '       0: disable compensation
 '       700..1400 (clamped to range)
 '   NOTE: To effect settings, opmode(CONT) must be called
-    _presscomp := 700 #(> p <# 1400)
+    _presscomp := (700 #> p <# 1400)
 
 
 PUB auto_cal_ena(s=-2): c
@@ -332,7 +332,7 @@ PRI writereg(reg_nr, val=0, len=1) | cmd_pkt, dat_tmp, crc_tmp
 
 DAT
 {
-Copyright 2024 Jesse Burt
+Copyright 2025 Jesse Burt
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 associated documentation files (the "Software"), to deal in the Software without restriction,
